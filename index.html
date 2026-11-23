@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Ploy & Wai — Wedding Snow Globe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Cinzel:wght@500;700&family=Noto+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="beam" class="beam" aria-hidden="true"></div>
+    <canvas id="fx-canvas" aria-hidden="true"></canvas>
+
+    <header class="top">
+      <p id="lead" class="lead">แตะลูกแก้วเพื่อเขย่า · ไขลานเพื่อเปิดเพลง</p>
+      <div id="title" class="title" role="img" aria-label="Ploy &amp; Wai">
+        <svg viewBox="0 0 350 105" aria-hidden="true">
+          <text id="t-ploy" x="8" y="76"><tspan class="g" style="--i:0">P</tspan><tspan class="g" style="--i:1">l</tspan><tspan class="g" style="--i:2">o</tspan><tspan class="g" style="--i:3">y</tspan></text>
+          <path id="t-heart" class="g heart" style="--i:4" transform="translate(190 50)" d="M0,20 C-34,-8 -24,-44 0,-22 C24,-44 34,-8 0,20Z"/>
+          <text id="t-wai" x="228" y="76"><tspan class="g" style="--i:5">W</tspan><tspan class="g" style="--i:6">a</tspan><tspan class="g" style="--i:7">i</tspan></text>
+        </svg>
+      </div>
+    </header>
+
+    <main class="stage">
+      <svg id="globe" viewBox="20 20 380 452" preserveAspectRatio="xMidYMid meet" aria-label="ลูกแก้วคู่บ่าวสาว แตะเพื่อเขย่า ลากเพื่อหมุน">
+        <defs>
+          <clipPath id="inside"><circle cx="200" cy="195" r="161"/></clipPath>
+          <clipPath id="above-base"><rect x="0" y="0" width="400" height="328"/></clipPath>
+          <radialGradient id="interior" cx="0.5" cy="0.62" r="0.62">
+            <stop offset="0" stop-color="#4e1b28"/><stop offset="0.65" stop-color="#1f0a10"/><stop offset="1" stop-color="#0b0406"/>
+          </radialGradient>
+          <radialGradient id="warm" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stop-color="#ffdcae" stop-opacity="0.55"/><stop offset="0.55" stop-color="#ff9f8a" stop-opacity="0.16"/><stop offset="1" stop-color="#ff9f8a" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="velvet" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#6d1628"/><stop offset="0.35" stop-color="#3e0a16"/><stop offset="1" stop-color="#1a0408"/>
+          </linearGradient>
+          <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f7e0a6"/><stop offset="0.5" stop-color="#d7b06a"/><stop offset="1" stop-color="#9c7334"/>
+          </linearGradient>
+          <linearGradient id="goldH" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#8f6a30"/><stop offset="0.45" stop-color="#f4dca0"/><stop offset="1" stop-color="#9c7334"/>
+          </linearGradient>
+          <linearGradient id="lacquer" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#0c0706"/><stop offset="0.42" stop-color="#2a1a16"/><stop offset="0.6" stop-color="#1c110e"/><stop offset="1" stop-color="#070403"/>
+          </linearGradient>
+          <radialGradient id="glassEdge" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0.82" stop-color="#fff7e6" stop-opacity="0"/><stop offset="1" stop-color="#fff7e6" stop-opacity="0.22"/>
+          </radialGradient>
+          <radialGradient id="pool" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stop-color="#ffd9a0" stop-opacity="0.32"/><stop offset="1" stop-color="#ffd9a0" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="keyGlow" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stop-color="#ffd58a" stop-opacity="0.55"/><stop offset="1" stop-color="#ffd58a" stop-opacity="0"/>
+          </radialGradient>
+          <!-- rose petal colours -->
+          <linearGradient id="p0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0405e"/><stop offset="1" stop-color="#8e0f27"/></linearGradient>
+          <linearGradient id="p1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2667f"/><stop offset="1" stop-color="#b51c3a"/></linearGradient>
+          <linearGradient id="p2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c2223d"/><stop offset="1" stop-color="#6e0a1d"/></linearGradient>
+          <linearGradient id="p3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffa3b3"/><stop offset="1" stop-color="#d9475f"/></linearGradient>
+          <path id="petal" d="M0,-3.6 C1.6,-5.8 5.2,-5.2 4.7,-1 C4.2,3 1.6,5.2 0,5.2 C-1.6,5.2 -4.2,3 -4.7,-1 C-5.2,-5.2 -1.6,-5.8 0,-3.6Z"/>
+        </defs>
+
+        <g id="globe-all">
+          <ellipse id="pool-el" cx="200" cy="462" rx="190" ry="16" fill="url(#pool)"/>
+
+          <g id="lit">
+            <!-- inside the glass -->
+            <g clip-path="url(#inside)">
+              <rect x="30" y="30" width="340" height="340" fill="url(#interior)"/>
+              <ellipse id="warm-el" cx="200" cy="225" rx="125" ry="135" fill="url(#warm)"/>
+              <g id="petals-back"></g>
+              <path id="ground" fill="url(#velvet)"/>
+              <ellipse cx="200" cy="302" rx="80" ry="15" fill="#6b4a1f"/>
+              <ellipse cx="200" cy="298" rx="80" ry="15" fill="url(#goldH)"/>
+              <ellipse cx="200" cy="297" rx="72" ry="12" fill="#2a0c13"/>
+              <ellipse cx="200" cy="297" rx="72" ry="12" fill="none" stroke="#f1d28a" stroke-opacity="0.35"/>
+              <g id="rim-dots"></g>
+              <g id="couple"></g>
+              <g id="petals-front"></g>
+            </g>
+
+            <!-- music-box pedestal -->
+            <rect x="96" y="326" width="208" height="26" rx="13" fill="url(#gold)"/>
+            <rect x="106" y="330" width="188" height="3" rx="1.5" fill="#fff4d6" opacity="0.5"/>
+            <path d="M84 350 H316 C318 380 328 420 338 446 H62 C72 420 82 380 84 350Z" fill="url(#lacquer)"/>
+            <path d="M86 357 H314" stroke="#d7b06a" stroke-width="1.6" opacity="0.85"/>
+            <path d="M70 437 H330" stroke="#d7b06a" stroke-width="1.2" opacity="0.6"/>
+            <g fill="none" stroke="#d7b06a" stroke-width="1.2" stroke-linecap="round" opacity="0.7">
+              <path d="M96 398 C106 388 118 388 123 396 C118 403 110 401 110 395"/>
+              <path d="M304 398 C294 388 282 388 277 396 C282 403 290 401 290 395"/>
+              <path d="M150 412 H250"/>
+            </g>
+            <text x="200" y="402" text-anchor="middle" font-family="Cinzel" font-weight="700" font-size="16" letter-spacing="3" fill="#f1d28a">PLOY &amp; WAI</text>
+            <rect x="50" y="444" width="300" height="18" rx="6" fill="#0a0605"/>
+            <path d="M54 445 H346" stroke="#d7b06a" stroke-width="1.4" opacity="0.7"/>
+          </g>
+
+          <!-- glass (always faintly visible) -->
+          <g id="glass" clip-path="url(#above-base)">
+            <circle cx="200" cy="195" r="161" fill="url(#glassEdge)"/>
+            <circle cx="200" cy="195" r="162" fill="none" stroke="#fff7e6" stroke-opacity="0.38" stroke-width="1.6"/>
+            <path d="M78 150 A128 128 0 0 1 152 74" fill="none" stroke="#fff7e6" stroke-opacity="0.55" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="170" cy="66" r="3.2" fill="#fff7e6" opacity="0.6"/>
+            <path d="M322 244 A128 128 0 0 1 292 288" fill="none" stroke="#fff7e6" stroke-opacity="0.25" stroke-width="4" stroke-linecap="round"/>
+          </g>
+
+          <!-- wind-up key (stays lit in the dark) -->
+          <circle id="key-glow" cx="358" cy="399" r="34" fill="url(#keyGlow)"/>
+          <rect x="324" y="395" width="28" height="8" rx="2" fill="#b68c45"/>
+          <rect x="340" y="393" width="4" height="12" rx="1.5" fill="#e3c27e"/>
+          <g transform="translate(360 399)">
+            <g id="key">
+              <path fill-rule="nonzero" fill="url(#gold)" stroke="#8f6a30" stroke-width="1"
+                d="M-9,-17 a9,9 0 1,1 18,0 a9,9 0 1,1 -18,0Z M-4.5,-17 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0Z
+                   M-9,17 a9,9 0 1,1 18,0 a9,9 0 1,1 -18,0Z M-4.5,17 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0Z
+                   M-5.5,-9 Q0,-4 5.5,-9 L5.5,9 Q0,4 -5.5,9Z"/>
+              <circle r="4" fill="#c99d55"/>
+            </g>
+          </g>
+        </g>
+
+        <!-- hit areas -->
+        <circle id="globe-hit" cx="200" cy="200" r="168" fill="transparent"/>
+        <circle id="key-hit" cx="356" cy="399" r="36" fill="transparent"/>
+      </svg>
+    </main>
+
+    <div id="key-hint" class="key-hint">ลองไขดูสิ</div>
+
+    <!-- Volume: appears after the first wind-up, expands into a slider on tap -->
+    <div id="vol" class="vol">
+      <button id="vol-btn" type="button" aria-label="เสียง">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z"></path>
+          <g id="vol-waves"></g>
+        </svg>
+      </button>
+      <input id="vol-range" type="range" min="0" max="100" value="50" aria-label="ระดับเสียง">
+    </div>
+
+    <!-- Wish card shown after sending -->
+    <div id="wish-card" class="wish-card" aria-live="polite">
+      <button id="wish-card-close" type="button" aria-label="ปิด">×</button>
+      <div id="wish-card-from" class="wish-from"></div>
+      <p id="wish-card-msg" class="wish-text"></p>
+      <video id="wish-card-video" controls playsinline hidden></video>
+    </div>
+
+    <nav class="tabbar"><button id="wish-open" class="wish-open" type="button">อวยพรคู่บ่าวสาว</button></nav>
+
+    <!-- Wish form -->
+    <div id="wish-modal" class="modal" aria-hidden="true">
+      <div class="sheet" role="dialog" aria-label="ส่งคำอวยพร">
+        <h2>ส่งคำอวยพร</h2>
+        <div class="field">
+          <input id="wish-name" type="text" placeholder="จาก..." autocomplete="off">
+          <span id="name-count" class="count">0/10</span>
+        </div>
+        <div class="field">
+          <textarea id="wish-msg" rows="4" placeholder="เขียนคำอวยพรถึงคู่บ่าวสาว"></textarea>
+          <span id="msg-count" class="count">0/100</span>
+        </div>
+        <div class="attach">
+          <input id="wish-video" type="file" accept="video/*" hidden>
+          <button id="wish-video-btn" type="button" class="ghost attach-btn">แนบวิดีโอ (ไม่เกิน 15 วินาที)</button>
+          <div id="wish-video-info" class="video-info" hidden>
+            <video id="wish-video-preview" muted playsinline></video>
+            <button id="wish-video-remove" type="button" aria-label="ลบวิดีโอ">ลบวิดีโอ</button>
+          </div>
+          <p id="wish-video-err" class="err" hidden></p>
+        </div>
+        <div class="actions">
+          <button id="wish-cancel" type="button" class="ghost">ยกเลิก</button>
+          <button id="wish-send" type="button" class="solid" disabled>ส่งคำอวยพร</button>
+        </div>
+        <div id="wish-confirm" class="confirm" hidden>
+          <h3>ยืนยันส่งคำอวยพร?</h3>
+          <div class="confirm-preview">
+            <div id="confirm-from" class="wish-from"></div>
+            <p id="confirm-msg" class="wish-text"></p>
+            <video id="confirm-video-player" controls playsinline hidden></video>
+          </div>
+          <p id="confirm-warn" class="confirm-warn" hidden></p>
+          <p class="confirm-note">เมื่อส่งแล้วจะแก้ไขไม่ได้</p>
+          <div class="actions">
+            <button id="confirm-back" type="button" class="ghost">กลับไปแก้ไข</button>
+            <button id="confirm-ok" type="button" class="solid">ยืนยันส่ง</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>
