@@ -98,7 +98,7 @@ class App {
     this.reveal = 0; this.level = 0;
     this.volume = 0.5; this.muted = false;
     this.energy = 0; this.speed = 1; this.windCount = 0; this.windT = 1; this.keyAngle = 0;
-    this.theta = 0.35; this.omega = 0; this.dragging = false; this.wobble = 0;
+    this.theta = 0; this.omega = 0; this.landT = 0; this.landK = 0; this.dragging = false; this.wobble = 0;
     this.slotT = 0; this.slot = 0; this.reliftT = 0;
     this.idleSince = performance.now(); this.idleDelay = 3000; this.hintOn = false;
     this.last = performance.now();
@@ -117,7 +117,33 @@ class App {
   }
 
   /* ===================== AUDIO ===================== */
+  // iPhone's silent switch mutes Web Audio unless the page is in "playback" mode
+  unmuteIOS() {
+    try { if (navigator.audioSession) { navigator.audioSession.type = 'playback'; return; } } catch (e) {}
+    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!iOS) return;
+    if (!this.keepAlive) {   // older iOS: a silent looping <audio> puts the page into playback mode
+      const rate = 8000, n = rate / 2, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
+      const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+      w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+      v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true);
+      v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+      const a = this.keepAlive = document.createElement('audio');
+      a.src = URL.createObjectURL(new Blob([b], { type: 'audio/wav' })); a.loop = true; a.setAttribute('playsinline', ''); a.volume = 0.01;
+    }
+    clearTimeout(this.keepAliveT);
+    this.keepAlive.play().catch(() => {});
+  }
+
+  // let the silent loop go when nothing is playing (so iOS doesn't show it as "now playing")
+  releaseIOS(delay = 2500) {
+    if (!this.keepAlive) return;
+    clearTimeout(this.keepAliveT);
+    this.keepAliveT = setTimeout(() => { if (!this.playing) this.keepAlive.pause(); }, delay);
+  }
+
   initAudio() {
+    this.unmuteIOS();
     if (this.ac) { if (this.ac.state === 'suspended') this.ac.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
@@ -239,12 +265,21 @@ class App {
         $('vol').classList.add('show');
         setTimeout(() => $('wish-open').classList.add('show'), 3800);
       }
+      this.planLanding();
       this.shake(0.5, false);
       this.startMelody();
     } else {
       this.stopMelody();
+      this.releaseIOS(3000);
       this.idleSince = performance.now(); this.idleDelay = 5000;
     }
+  }
+
+  // choose where the turntable stops: a whole number of turns ahead, about 2 turns per wind
+  planLanding() {
+    const TAU = Math.PI * 2, E = Math.max(this.energy, 0.05);
+    this.landT = Math.ceil((this.theta + 0.6 * RUN_SECONDS * E) / TAU) * TAU;
+    this.landK = (this.landT - this.theta) / E;
   }
 
   /* ---------- wind-up key ---------- */
@@ -359,12 +394,20 @@ class App {
   }
 
   shake(power = 1, sound = true) {
+    // every petal gets its own random spot anywhere inside the glass, plus a swirl around the centre
+    const lift = clamp(power + 0.25, 0, 1), k = 1.7 * clamp(power, 0.45, 1.2), swirl = rnd(-1, 1) > 0 ? 1 : -1;
     for (const p of this.parts) {
+      if (Math.random() > lift) continue;
+      let tx, ty;
+      do { tx = rnd(-1, 1) * R_IN; ty = rnd(-1, 1) * R_IN; } while (tx * tx + ty * ty > R_IN * R_IN * 0.82 || ty > 95);
+      const dx = tx - p.x, dy = ty - p.y;
       p.rest = false;
-      p.vx = rnd(-1, 1) * 150 * power; p.vy = -rnd(60, 220) * power; p.vr = rnd(-360, 360) * power;
+      p.vx = dx * k + (-p.y) * 0.5 * swirl + rnd(-30, 30);
+      p.vy = dy * k - 18 + p.x * 0.5 * swirl + rnd(-30, 30);
+      p.vr = rnd(-420, 420) * power; p.vf = rnd(2, 6);
     }
     this.wobble = Math.min(1, 0.4 + power * 0.6);
-    if (sound) { this.initAudio(); this.playShake(power); }
+    if (sound) { this.initAudio(); this.playShake(power); this.releaseIOS(); }
     this.touch();
   }
 
@@ -434,13 +477,15 @@ class App {
     const end = () => {
       if (!d) return;
       if (d.moved <= 6 && performance.now() - d.t0 < 450) this.shake(1);
+      if (this.dragging && this.playing) this.planLanding();
+      else if (this.dragging) this.landT = Math.round(this.theta / (Math.PI * 2)) * Math.PI * 2;
       this.dragging = false; d = null;
     };
     hit.addEventListener('pointerup', end);
     hit.addEventListener('pointercancel', end);
     hit.addEventListener('click', () => this.askMotion());   // iOS motion permission needs a click
 
-    $('key-hit').addEventListener('click', () => { this.askMotion(); this.wind(); });
+    $('key-hit').addEventListener('click', () => this.wind());
 
     if (DEVICE_SHAKE && 'DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission !== 'function') this.listenMotion();
   }
@@ -448,7 +493,9 @@ class App {
   askMotion() {
     if (!DEVICE_SHAKE || this.motionAsked || !window.DeviceMotionEvent || typeof DeviceMotionEvent.requestPermission !== 'function') return;
     this.motionAsked = true;
-    DeviceMotionEvent.requestPermission().then((s) => { if (s === 'granted') this.listenMotion(); }).catch(() => {});
+    DeviceMotionEvent.requestPermission()
+      .then((s) => { if (s === 'granted') this.listenMotion(); else this.toast('แตะลูกแก้วเพื่อเขย่าแทนได้นะ'); })
+      .catch(() => {});
   }
 
   listenMotion() {
@@ -459,10 +506,15 @@ class App {
       const a = e.accelerationIncludingGravity; if (!a || a.x == null) return;
       if (prev) {
         const j = Math.abs(a.x - prev.x) + Math.abs(a.y - prev.y) + Math.abs(a.z - prev.z), now = performance.now();
-        if (j > 22 && now - lastShake > 450) { lastShake = now; this.shake(clamp(j / 40, 0.6, 1.3)); }
+        if (j > 22 && now - lastShake > 450 && !this.formOpen) { lastShake = now; this.shake(clamp(j / 40, 0.6, 1.3)); }
       }
       prev = { x: a.x, y: a.y, z: a.z };
     });
+  }
+
+  toast(text) {
+    const el = $('toast'); el.textContent = text; el.classList.add('show');
+    clearTimeout(this.toastT); this.toastT = setTimeout(() => el.classList.remove('show'), 3500);
   }
 
   /* ===================== LAYOUT + FX ===================== */
@@ -474,9 +526,9 @@ class App {
     // aim the spotlight at the glass
     const r = $('globe-hit').getBoundingClientRect(), app = $('app').getBoundingClientRect();
     const gx = r.left + r.width / 2 - app.left, gy = r.top + r.height / 2 - app.top, gr = r.width / 2;
-    const beam = $('beam');
-    beam.style.left = `${gx - gr * 1.25}px`; beam.style.width = `${gr * 2.5}px`; beam.style.height = `${gy + gr * 1.1}px`;
-    this.beamBox = { x: gx, top: 0, bottom: gy + gr * 0.4, w: gr * 1.6 };
+    const beam = $('beam'), bw = gr * 2.6, cx = this.W / 2;
+    beam.style.left = `${cx - bw / 2}px`; beam.style.width = `${bw}px`; beam.style.height = `${gy + gr * 1.15}px`;
+    this.beamBox = { x: cx, top: 0, bottom: gy + gr * 0.4, w: gr * 1.6 };
   }
 
   initFx() {
@@ -540,7 +592,8 @@ class App {
     document.addEventListener('pointerdown', (e) => { if (!vol.contains(e.target)) vol.classList.remove('open'); });
 
     // wishes
-    const modal = $('wish-modal'), nameEl = $('wish-name'), msgEl = $('wish-msg'), send = $('wish-send'), card = $('wish-card');
+    const modal = $('wish-modal'), send = $('wish-send'), card = $('wish-card');
+    let nameEl = $('wish-name'), msgEl = $('wish-msg');
     const vInput = $('wish-video'), vInfo = $('wish-video-info'), vPrev = $('wish-video-preview');
     const vErr = $('wish-video-err'), cardVid = $('wish-card-video');
     let file = null, fileUrl = null, cardUrl = null;
@@ -559,6 +612,14 @@ class App {
     };
     limit(nameEl, $('name-count'), LIM_NAME);
     limit(msgEl, $('msg-count'), LIM_MSG);
+    // iOS offers "Undo Typing" when the phone is shaken after typing in a text box.
+    // Swapping in fresh copies of the fields (keeping what was typed) drops that typing history.
+    const freshFields = () => {
+      [nameEl, msgEl].forEach((el) => el.blur());
+      const swap = (el) => { const n = el.cloneNode(false); n.value = el.value; el.replaceWith(n); return n; };
+      nameEl = swap(nameEl); msgEl = swap(msgEl);
+      limit(nameEl, $('name-count'), LIM_NAME); limit(msgEl, $('msg-count'), LIM_MSG);
+    };
 
     const showErr = (t) => { vErr.textContent = t; vErr.hidden = !t; };
     const clearVideo = () => {
@@ -584,8 +645,12 @@ class App {
       probe.src = url;
     });
 
-    const openM = () => { modal.classList.add('open'); modal.setAttribute('aria-hidden', 'false'); setTimeout(() => nameEl.focus(), 250); };
-    const closeM = () => { setConfirm(false); modal.classList.remove('open'); modal.setAttribute('aria-hidden', 'true'); };
+    const openM = () => { this.formOpen = true; modal.classList.add('open'); modal.setAttribute('aria-hidden', 'false'); setTimeout(() => nameEl.focus(), 250); };
+    const closeM = () => {
+      const wasOpen = modal.classList.contains('open');
+      setConfirm(false); modal.classList.remove('open'); modal.setAttribute('aria-hidden', 'true');
+      if (wasOpen) { freshFields(); setTimeout(() => { this.formOpen = false; }, 600); }
+    };
     $('wish-open').addEventListener('click', openM);
     $('wish-cancel').addEventListener('click', closeM);
     modal.addEventListener('pointerdown', (e) => { if (e.target === modal) closeM(); });
@@ -645,7 +710,8 @@ class App {
     this.glassEl.setAttribute('opacity', (0.55 + 0.45 * L).toFixed(3));
     this.warm.setAttribute('opacity', (0.25 + 0.75 * L).toFixed(3));
     this.pool.setAttribute('opacity', L.toFixed(3));
-    $('beam').style.opacity = (Math.min(1, e * 1.6) * (this.flick || 1)).toFixed(3);
+    const bo = (Math.min(1, e * 1.6) * (this.flick || 1)).toFixed(3);
+    $('beam').style.opacity = bo; $('beam-src').style.opacity = bo;
 
     const ti = $('title'), want = this.playing && this.reveal > 0.35;
     if (want && !this.titleOn) {
@@ -659,14 +725,22 @@ class App {
     this.updateKey(dt);
     this.updateMelody(dt);
 
-    // turntable: spins with the music, coasts after a drag, then eases back to face the guest
+    // turntable. While the music plays the angle is tied to the spring (theta = landT - landK * energy),
+    // so it always comes to rest exactly facing the guest when the music runs out.
     if (!this.dragging) {
-      const target = this.playing ? 0.6 * this.speed : 0;
-      this.omega += (target - this.omega) * Math.min(1, dt * (this.playing ? 1.2 : 1.6));
-      this.theta += this.omega * dt;
-      if (!this.playing && Math.abs(this.omega) < 0.15) {
-        const goal = Math.round((this.theta - 0.35) / (Math.PI * 2)) * Math.PI * 2 + 0.35;
-        this.theta += (goal - this.theta) * Math.min(1, dt * 1.2);
+      if (this.playing) {
+        const goal = this.landT - this.landK * this.energy;
+        this.theta += (goal - this.theta) * Math.min(1, dt * 2.5);
+      } else if (this.reveal > 0) {
+        this.theta += (this.landT - this.theta) * Math.min(1, dt * 2.5);   // finish the last few degrees
+        this.omega = 0;
+      } else {
+        this.omega *= Math.exp(-1.6 * dt);                                  // coast after a drag…
+        this.theta += this.omega * dt;
+        if (Math.abs(this.omega) < 0.2) {                                   // …then turn back to face front
+          const goal = Math.round(this.theta / (Math.PI * 2)) * Math.PI * 2;
+          this.theta += (goal - this.theta) * Math.min(1, dt * 1.4);
+        }
       }
     }
     this.drawCouple();
