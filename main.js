@@ -679,13 +679,15 @@ class App {
       if (fileUrl) URL.revokeObjectURL(fileUrl);
       file = null; fileUrl = null; vInput.value = ''; vInfo.hidden = true; vPrev.removeAttribute('src'); refresh();
     };
+    // guidance for guests, built from the limits so it stays right when MAX_VIDEO_MB changes
+    $('wish-video-tip').textContent = `กล้องหน้าหรือหลังก็ได้ · ยาวไม่เกิน ${VIDEO_MAX}\u00a0วินาที\nไฟล์ไม่เกิน ${MAX_VIDEO_MB}\u00a0MB · แนะนำ Full\u00a0HD หรือ 4K\u00a030fps`;
     $('wish-video-btn').addEventListener('click', () => vInput.click());
     $('wish-video-remove').addEventListener('click', () => { clearVideo(); showErr(''); });
     vInput.addEventListener('change', () => {
       const f = vInput.files[0]; if (!f) return;
       showErr('');
       if (!f.type.startsWith('video/')) { showErr('กรุณาเลือกไฟล์วิดีโอ'); vInput.value = ''; return; }
-      if (f.size > MAX_VIDEO_MB * 1024 * 1024) { showErr(`ไฟล์ใหญ่เกิน ${MAX_VIDEO_MB} MB`); vInput.value = ''; return; }
+      if (f.size > MAX_VIDEO_MB * 1024 * 1024) { showErr(`ไฟล์ ${Math.ceil(f.size / 1048576)} MB ใหญ่เกิน ${MAX_VIDEO_MB} MB ลองถ่ายให้สั้นลง หรือตั้งกล้องเป็น Full HD (1080p)`); vInput.value = ''; return; }
       const url = URL.createObjectURL(f), probe = document.createElement('video');
       probe.preload = 'metadata';
       probe.onloadedmetadata = () => {
