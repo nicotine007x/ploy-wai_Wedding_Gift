@@ -19,8 +19,8 @@ const DEVICE_SHAKE = true;
  * Use the PUBLISHABLE key (sb_publishable_…) or the legacy "anon" key. It is meant to be public.
  * NEVER put the secret / service_role key here.
  * Leave both empty = demo mode (wishes are shown but not saved). */
-const SUPABASE_URL = '';   // e.g. 'https://abcdefghijkl.supabase.co'
-const SUPABASE_KEY = '';   // e.g. 'sb_publishable_xxxxxxxx'
+const SUPABASE_URL = 'https://mbolgqopvqozqzzujihu.supabase.co';   // e.g. 'https://abcdefghijkl.supabase.co'
+const SUPABASE_KEY = 'sb_publishable_kPCvBUGZraaTrWP0Z3rPMw_oojY96ju';   // e.g. 'sb_publishable_xxxxxxxx'
 const WISH_TABLE = 'wishes';
 const VIDEO_BUCKET = 'wish-videos'; // shake the phone to shake the globe (iOS asks permission on first tap)
 
