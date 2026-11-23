@@ -25,9 +25,11 @@ create policy "guests can send wishes"
   to anon, authenticated
   with check (true);
 
--- 2) Video storage (private bucket, 50 MB per file, videos only) -------------
+-- 2) Video storage (private bucket, videos only) -----------------------------
+-- No size limit on the bucket itself: it follows Storage → Settings → "Upload file size limit"
+-- (50 MB on the free plan; raise it there after upgrading, plus MAX_VIDEO_MB in main.js).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('wish-videos', 'wish-videos', false, 52428800, array['video/*'])
+values ('wish-videos', 'wish-videos', false, null, array['video/*'])
 on conflict (id) do update
   set public = excluded.public,
       file_size_limit = excluded.file_size_limit,
