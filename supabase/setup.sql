@@ -15,6 +15,8 @@ create table if not exists public.wishes (
 
 alter table public.wishes enable row level security;
 
+-- (explicit grants: works even when "Grant API access to new tables automatically" is off)
+grant usage on schema public to anon, authenticated;
 grant insert on public.wishes to anon, authenticated;
 
 drop policy if exists "guests can send wishes" on public.wishes;
