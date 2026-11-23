@@ -7,12 +7,22 @@
 
 /* ===================== SETTINGS ===================== */
 const LIM_NAME = 10, LIM_MSG = 100;
-const VIDEO_MAX = 15, MAX_VIDEO_MB = 150;
+const VIDEO_MAX = 15, MAX_VIDEO_MB = 50;   // Supabase free plan: 50 MB per file
 const MUSIC_FILE = '';     // e.g. 'music.mp3' (put the file next to index.html); '' = built-in music-box synth
 const RUN_SECONDS = 22;    // one full wind lasts this long
 const WIND_TURNS = 1;      // taps on the key needed to start (the 3D version used 3)
 const PETALS = 120;        // rose petals inside the globe
-const DEVICE_SHAKE = true; // shake the phone to shake the globe (iOS asks permission on first tap)
+const DEVICE_SHAKE = true;
+
+/* ----- Supabase (where wishes + videos are stored) -----
+ * Paste from Supabase → Project Settings → API Keys / Data API.
+ * Use the PUBLISHABLE key (sb_publishable_…) or the legacy "anon" key. It is meant to be public.
+ * NEVER put the secret / service_role key here.
+ * Leave both empty = demo mode (wishes are shown but not saved). */
+const SUPABASE_URL = '';   // e.g. 'https://abcdefghijkl.supabase.co'
+const SUPABASE_KEY = '';   // e.g. 'sb_publishable_xxxxxxxx'
+const WISH_TABLE = 'wishes';
+const VIDEO_BUCKET = 'wish-videos'; // shake the phone to shake the globe (iOS asks permission on first tap)
 
 const $ = (id) => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';
@@ -517,6 +527,49 @@ class App {
     clearTimeout(this.toastT); this.toastT = setTimeout(() => el.classList.remove('show'), 3500);
   }
 
+  /* ===================== SAVING WISHES (Supabase) ===================== */
+  sbHeaders() {
+    const h = { apikey: SUPABASE_KEY };
+    if (!SUPABASE_KEY.startsWith('sb_')) h.Authorization = `Bearer ${SUPABASE_KEY}`;   // legacy anon key is a JWT
+    return h;
+  }
+
+  uploadVideo(path, file, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/${VIDEO_BUCKET}/${path}`);
+      Object.entries(this.sbHeaders()).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+      xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+      xhr.setRequestHeader('x-upsert', 'false');
+      xhr.timeout = 10 * 60 * 1000;
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)); };
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`upload ${xhr.status}: ${xhr.responseText}`));
+      xhr.onerror = () => reject(new Error('upload network error'));
+      xhr.ontimeout = () => reject(new Error('upload timeout'));
+      xhr.send(file);
+    });
+  }
+
+  async saveWish({ name, message, file }, onProgress = () => {}) {
+    if (!SUPABASE_URL || !SUPABASE_KEY) { console.warn('[wish] Supabase not set up yet: demo mode, nothing saved.'); return; }
+    let video_path = null;
+    if (file && this.lastUpload && this.lastUpload.file === file) video_path = this.lastUpload.path;   // retry: video already up
+    else if (file) {   // 1) video first, so a saved wish never points at a missing file
+      const ext = ((file.name.match(/\.([a-z0-9]{2,5})$/i) || [])[1] || (file.type.split('/')[1] || 'mp4')).toLowerCase();
+      video_path = `${new Date().toISOString().slice(0, 10)}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      await this.uploadVideo(video_path, file, onProgress);
+      this.lastUpload = { file, path: video_path };
+    }
+    // 2) the wish itself
+    const res = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${WISH_TABLE}`, {
+      method: 'POST',
+      headers: { ...this.sbHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ name: name || null, message: message || null, video_path })
+    });
+    if (!res.ok) throw new Error(`insert ${res.status}: ${await res.text()}`);
+    this.lastUpload = null;
+  }
+
   /* ===================== LAYOUT + FX ===================== */
   resize() {
     const dpr = Math.min(devicePixelRatio || 1, 2), fx = $('fx-canvas');
@@ -653,8 +706,8 @@ class App {
     };
     $('wish-open').addEventListener('click', openM);
     $('wish-cancel').addEventListener('click', closeM);
-    modal.addEventListener('pointerdown', (e) => { if (e.target === modal) closeM(); });
-    addEventListener('keydown', (e) => { if (e.key === 'Escape') closeM(); });
+    modal.addEventListener('pointerdown', (e) => { if (e.target === modal && !this.sending) closeM(); });
+    addEventListener('keydown', (e) => { if (e.key === 'Escape' && !this.sending) closeM(); });
     const doSend = () => {
       const name = nameEl.value.trim(), msg = msgEl.value.trim();
       if (!msg && !file) return;
@@ -691,7 +744,25 @@ class App {
       setConfirm(true);
     });
     $('confirm-back').addEventListener('click', () => setConfirm(false));
-    $('confirm-ok').addEventListener('click', () => { cv.pause(); setConfirm(false); doSend(); });
+    const okBtn = $('confirm-ok'), backBtn = $('confirm-back'), warnEl = $('confirm-warn');
+    okBtn.addEventListener('click', async () => {
+      if (this.sending) return;
+      const name = nameEl.value.trim(), msg = msgEl.value.trim();
+      if (!msg && !file) return;
+      cv.pause();
+      this.sending = true; okBtn.disabled = backBtn.disabled = true;
+      okBtn.textContent = file ? 'กำลังส่ง... 0%' : 'กำลังส่ง...';
+      try {
+        await this.saveWish({ name, message: msg, file }, (pct) => { okBtn.textContent = `กำลังส่ง... ${pct}%`; });
+        this.sending = false;
+        setConfirm(false); doSend();
+      } catch (err) {
+        console.error('[wish] send failed', err);
+        warnEl.textContent = 'ส่งไม่สำเร็จ ลองเช็กอินเทอร์เน็ตแล้วกด "ยืนยันส่ง" อีกครั้งนะ'; warnEl.hidden = false;
+      } finally {
+        this.sending = false; okBtn.disabled = backBtn.disabled = false; okBtn.textContent = 'ยืนยันส่ง';
+      }
+    });
     $('wish-card-close').addEventListener('click', () => { card.classList.remove('show'); cardVid.pause(); });
   }
 
